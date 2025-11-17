@@ -2,13 +2,9 @@ import pandas as pd
 import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy import units as u
-from astropy.io import ascii
+from astropy.table import Table
 import sqlalchemy as sqal
 import mariadb
-
-data = pd.read_csv("hyg_v42.csv", encoding="utf-8")
-
-data2 = ascii.read("hyg_v42.csv", encoding="utf-8")
 
 def create_MariaDB():
     DB_CONFIG = {
@@ -81,7 +77,8 @@ def upload_MariaDB():
         f"@{DB_CONFIG['host']}/{DB_CONFIG['database']}"
     )
 
-    df = pd.read_csv("hyg_v42.csv")
+    ast = Table.read("hyg_v42.csv", format="csv", encoding="utf-8")
+    df = ast.to_pandas()
 
     df.to_sql("hyg_4_2", engine, if_exists="append", index=False, method="multi", chunksize=500)
 
