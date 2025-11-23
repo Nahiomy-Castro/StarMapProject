@@ -7,9 +7,6 @@ from astropy.io import ascii
 import numpy as np
 import matplotlib as plt
 
-import db_connection as db
+if __name__ == '__main__':
 
-#db.create_MariaDB()
-
-db.upload_MariaDB()
-
+    print()

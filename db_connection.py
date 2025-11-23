@@ -77,13 +77,49 @@ def upload_MariaDB():
         f"@{DB_CONFIG['host']}/{DB_CONFIG['database']}"
     )
 
-    ast = Table.read("hyg_v42.csv", format="csv", encoding="utf-8")
-    df = ast.to_pandas()
 
-    df.to_sql("hyg_4_2", engine, if_exists="append", index=False, method="multi", chunksize=500)
+    # hyg = Table.read("hyg_v42.csv", format="csv", encoding="utf-8")
+    # df_hyg = hyg.to_pandas()
+    # df_hyg.to_sql("hyg_4_2", engine, if_exists="append", index=False, method="multi", chunksize=500)
+    #
+    # print("HYG 4.2 Database uploaded successfully.\n")
+
+    # cons_88 = Table.read("88-constellations.csv", format="csv", encoding="utf-8")
+    # df_cons88 = cons_88.to_pandas()
+    # df_cons88.to_sql("cons_88", engine, if_exists="append", index=False, method="multi", chunksize=500)
+
+    # cons = Table.read("constellations.csv", format="csv", encoding="utf-8")
+    # df_cons = cons.to_pandas()
+    # df_cons.to_sql("cons", engine, if_exists="append", index=False, method="multi", chunksize=500)
+    #
+    # print("Constellations Database uploaded successfully.\n")
+    #
+    # synthstar = Table.read("star_dataset.csv", format="csv", encoding="utf-8")
+    # df_synth = synthstar.to_pandas()
+    # df_synth.to_sql("synthset", engine, if_exists="append", index=False, method="multi", chunksize=500)
+    #
+    # print("Synthetic Database uploaded successfully.\n")
+    #
+    # hygtest = Table.read("hyg_v42_updated_test.csv", format="csv", encoding="utf-8")
+    # df_hygtest = hygtest.to_pandas()
+    # df_hygtest.to_sql("hyg_4_2_updated_test", engine, if_exists="append", index=False, method="multi", chunksize=500)
+    #
+    # print("HYG 4.2 Test Database uploaded successfully.\n")
+    #
+    #
+    hygupdated = Table.read("hyg_v42_updated.csv", format="csv", encoding="utf-8")
+    df_hygupdated = hygupdated.to_pandas()
+    df_hygupdated.to_sql("hyg_4_2_updated", engine, if_exists="append", index=False, method="multi", chunksize=500)
+
+    print("HYG 4.2 Updated Database uploaded successfully.\n")
+
+    print("All databases uploaded successfully.\n")
 
 
-    print("Database uploaded successfully.")
+if __name__ == "__main__":
+
+    #create_MariaDB()
+    upload_MariaDB()
 
 
 
