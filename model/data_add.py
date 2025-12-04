@@ -133,7 +133,7 @@ def run_bulk_crossmatch(input_csv_path, output_csv_path):
         star_name = stardata.at[i, 'proper'] if 'proper' in stardata.columns else ''
 
         if star_name == 'Sol':
-            # Set Sun's values directly (no need to query)
+            # Set Sun's values directly (no need to text_input)
             stardata.at[i, 'tic'] = None  # Sun doesn't have a TIC entry
             stardata.at[i, 'mass'] = 1.0
             stardata.at[i, 'radius'] = 1.0
