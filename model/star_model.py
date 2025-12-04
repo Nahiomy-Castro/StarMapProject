@@ -16,7 +16,7 @@ from abc import ABC, abstractmethod
 class MLModel(ABC):
     #Constructor includes filepath to be used along with the amount of rows
     #that will be used from the file
-    def __init__(self, csv_path="hyg_v42_updated.csv", nrows=None):
+    def __init__(self, csv_path="data/hyg_v42_updated.csv", nrows=None):
 
         #If there is a given value of rows, read the file up until that row
         if nrows:
@@ -67,6 +67,44 @@ class MLModel(ABC):
 
         return {'r2': r2, 'rmse': rmse, 'mae': mae}
 
+    def predict(self, input_data):
+        """
+        Predict luminosity for a single star or batch of stars.
+
+        Parameters:
+        -----------
+        input_data : dict or pd.DataFrame or np.array
+            Single row or multiple rows of star data
+
+        Returns:
+        --------
+        float or np.array : Predicted luminosity value(s)
+        """
+        if self.model is None:
+            raise ValueError("Model has not been trained yet. Call train_model() first.")
+
+        if self.scaler is None:
+            raise ValueError("Scaler not initialized. Call train_model() first.")
+
+        # Convert dict to array
+        if isinstance(input_data, dict):
+            input_array = np.array([[input_data[feature] for feature in self.feature_names]])
+        # Convert DataFrame to array
+        elif isinstance(input_data, pd.DataFrame):
+            input_array = input_data[self.feature_names].values
+        # Assume it's already an array
+        else:
+            input_array = np.array(input_data).reshape(1, -1) if len(np.array(input_data).shape) == 1 else input_data
+
+        # Scale the input using the same scaler from training
+        input_scaled = self.scaler.transform(input_array)
+
+        # Make prediction
+        prediction = self.model.predict(input_scaled)
+
+        return prediction[0] if len(prediction) == 1 else prediction
+
+
     @abstractmethod
     def visualize_model(self, filename):
         pass
@@ -94,7 +132,7 @@ class MLModel(ABC):
 
 class TradModel(MLModel):
 
-    def __init__(self, csv_path="hyg_v42_updated.csv", nrows=30000):
+    def __init__(self, csv_path="data/hyg_v42_updated.csv", nrows=30000):
         super().__init__(csv_path, nrows)
         self.required_features = ['mass', 'radius', 'temp', 'dist', 'absmag']
         self.target = 'lum'
@@ -137,6 +175,26 @@ class TradModel(MLModel):
 
         self.y_pred = self.model.predict(self.X_test)
 
+    def input_predict(self, star_id):
+        stardata = pd.read_csv("data/hyg_v42_updated.csv")
+
+        star_row = stardata[stardata['id'].astype(str) == str(star_id)]
+
+        if star_row.empty:
+            raise ValueError(f"Star with ID {star_id} not found")
+
+        star = star_row.iloc[0]
+
+        star_data = {
+            'mass': star['mass'],
+            'radius': star['radius'],
+            'temp': star['temp'],
+            'dist': star['dist'],
+            'absmag': star['absmag']
+        }
+
+        return self.predict(star_data)
+
     def visualize_model(self, filename='trad_ml_model_results.png'):
         if self.y_pred is None:
             raise ValueError("Model has not been trained yet.")
@@ -167,13 +225,14 @@ class TradModel(MLModel):
         plt.tight_layout()
         plt.savefig(filename, dpi=300, bbox_inches='tight')
 
+
 '''================================================================================================================================================================'''
 '''================================================================================================================================================================'''
 '''================================================================================================================================================================'''
 
 class GraphModel(MLModel):
 
-    def __init__(self, csv_path="hyg_v42_updated.csv", nrows=30000, k_neighbors=5):
+    def __init__(self, csv_path="data/hyg_v42_updated.csv", nrows=30000, k_neighbors=5):
         super().__init__(csv_path, nrows)
         self.required_features = ['ra', 'dec', 'mass', 'radius', 'temp', 'dist', 'absmag', 'lum']
         self.k_neighbors = k_neighbors
@@ -326,7 +385,7 @@ class GraphModel(MLModel):
 '''================================================================================================================================================================'''
 
 class ClusterModel(MLModel):
-    def __init__(self, csv_path="hyg_v42_updated.csv", nrows=30000, n_clusters=10):
+    def __init__(self, csv_path="data/hyg_v42_updated.csv", nrows=30000, n_clusters=10):
         super().__init__(csv_path, nrows)
         self.required_features = ['mass', 'radius', 'temp', 'dist', 'ra', 'dec', 'absmag', 'lum']
         self.n_clusters = n_clusters

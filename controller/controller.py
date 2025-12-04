@@ -8,7 +8,8 @@ MODEL_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "..", "model"))
 if MODEL_DIR not in sys.path:
     sys.path.append(MODEL_DIR)
 
-from stars_factory import StarsFactory
+from model.stars_factory import StarsFactory
+from model.star_model import TradModel, ModelTrainer
 
 class Controller:
     def __init__(self, star_model, const_model):
