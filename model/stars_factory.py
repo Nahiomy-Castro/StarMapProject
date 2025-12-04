@@ -43,7 +43,8 @@ class StarsFactory:
             ),
             paper_bgcolor='black',
             font=dict(color='white'),
-            height=800
+            height=800,
+            showlegend=False
         )
         return fig
 
@@ -140,6 +141,7 @@ class StarsFactory:
             ),
             paper_bgcolor='black',
             font=dict(color='white'),
-            height=800
+            height=800,
+            showlegend=False
         )
         return fig

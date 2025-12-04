@@ -21,7 +21,8 @@ StarsFactory = import_from_path("stars_factory", os.path.join(PROJECT_ROOT, "mod
 
 
 def main():
-    st.title("⭐ Interactive Star Atlas")
+    st.title("⭐ Star Atlas")
+    st.divider()
 
     # Init MVC
     stars = StarData()
@@ -29,8 +30,12 @@ def main():
     controller = Controller(stars, consts)
 
     # UI controls
-    distance_ly = st.slider("Distance (ly)", 10, 500, 500)
-    target_query = st.text_input("Target star:", "Sol")
+    distance_ly = st.slider("Distance from target star (light years):", 10, 500, 500)
+
+    options = stars.stars['proper']
+    options = options[options != ""].dropna().to_list()
+
+    target_query = st.selectbox("Target star:", options)
 
     # Convert
     distance_pc = distance_ly / 3.26
