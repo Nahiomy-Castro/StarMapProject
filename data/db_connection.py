@@ -1,7 +1,3 @@
-import pandas as pd
-import numpy as np
-from astropy.coordinates import SkyCoord
-from astropy import units as u
 from astropy.table import Table
 import sqlalchemy as sqal
 import mariadb

@@ -3,10 +3,38 @@ import numpy as np
 import plotly.graph_objects as go
 import pandas as pd
 
+# --- Luminosity → Stellar Class ---
+def classify_star_from_luminosity(lum):
+    if pd.isna(lum):
+        return "Unknown"
+
+    if lum < 0.0001:
+        return "Brown Dwarf"
+    elif lum < 0.01:
+        return "Red Dwarf"
+    elif lum < 50:
+        return "Main Sequence"
+    elif lum < 1000:
+        return "Giant"
+    else:
+        return "Supergiant"
+
+STAR_STYLE = {
+    "Brown Dwarf": {"size": 2, "color": 0.2},
+    "Red Dwarf": {"size": 3, "color": 0.3},
+    "Main Sequence": {"size": 6, "color": 0.6},
+    "Giant": {"size": 10, "color": 0.8},
+    "Supergiant": {"size": 14, "color": 1.0},
+    "Unknown": {"size": 3, "color": 0.4}
+}
+
 class StarsFactory:
     @staticmethod
     def create_plot(plot_type, stars_filtered, constellations=None):
         if plot_type == "stars_only":
+            if "luminosity_class" not in stars_filtered.columns:
+                stars_filtered["luminosity_class"] = stars_filtered["predicted_luminosity"].apply(
+                    classify_star_from_luminosity)
             return StarsFactory._scatter3d(stars_filtered)
         elif plot_type == "constellations":
             return StarsFactory._constellation_plot(stars_filtered, constellations)
@@ -29,7 +57,8 @@ class StarsFactory:
                 cmin=0, cmax=1
             ),
             text=stars_filtered.apply(
-                lambda r: r['proper'] or r['bf'] or f"HIP {r['hip']}", axis=1
+                lambda r: f"{r['proper'] or r['bf'] or ('HIP ' + str(r['hip']))}<br>Type: {r['luminosity_class']}",
+                axis=1
             ),
             hovertemplate="%{text}<extra></extra>"
         )
@@ -50,8 +79,16 @@ class StarsFactory:
 
     @staticmethod
     def _constellation_plot(stars_filtered, constellations):
-        # Map HIP → coords
-        hip_to_star = {
+        if "luminosity_class" not in stars_filtered.columns:
+            if "predicted_luminosity" in stars_filtered.columns:
+                stars_filtered["luminosity_class"] = stars_filtered["predicted_luminosity"].apply(
+                    classify_star_from_luminosity
+                )
+            else:
+                # fallback if no predicted_luminosity column exists
+                stars_filtered["luminosity_class"] = "Unknown"
+
+            hip_to_star = {
             int(row['hip']): (row['cx_scaled'], row['cy_scaled'], row['cz_scaled'])
             for _, row in stars_filtered.iterrows()
             if pd.notna(row['hip'])
@@ -73,9 +110,12 @@ class StarsFactory:
         stars_filtered['in_constellation'] = stars_filtered['hip'].apply(
             lambda x: x in const_hips if pd.notna(x) else False
         )
-        stars_filtered['marker_size'] = stars_filtered['mag'].apply(get_marker_size)
-        stars_filtered['marker_color'] = stars_filtered.apply(
-            lambda r: get_marker_color(r['mag'], r['in_constellation']), axis=1
+        stars_filtered["marker_size"] = stars_filtered["luminosity_class"].apply(
+            lambda c: STAR_STYLE[c]["size"]
+        )
+
+        stars_filtered["marker_color"] = stars_filtered["luminosity_class"].apply(
+            lambda c: STAR_STYLE[c]["color"]
         )
 
         # Scatter
@@ -93,7 +133,8 @@ class StarsFactory:
                 cmin=0, cmax=1
             ),
             text=stars_filtered.apply(
-                lambda r: r['proper'] or r['bf'] or f"HIP {r['hip']}", axis=1
+                lambda r: f"{r['proper'] or r['bf'] or ('HIP ' + str(r['hip']))}<br>Type: {r['luminosity_class']}",
+                axis=1
             ),
             hovertemplate="%{text}<extra></extra>"
         )
