@@ -78,6 +78,9 @@ def main():
 
     st.write(f"**True Luminosity:** {target['lum']} L☉")
 
+    stel_class = traditional_model.stellar_classification(target['temp'], predlum_val)
+    st.write(f"**Stellar Classification:** {stel_class}")
+
 if __name__ == "__main__":
     traditional_model = StarModel.TradModel(nrows=5000)
     trainer = StarModel.ModelTrainer(traditional_model)

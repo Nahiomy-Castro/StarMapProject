@@ -207,6 +207,53 @@ class TradModel(MLModel):
 
         return self.predict(star_data)
 
+    def stellar_classification(self, temp, predlum):
+        classification = "Unclassified"
+
+        if 2500 <= temp < 3500:
+            if 0.0001 < predlum < 0.08:
+                classification = "Main Sequence (M)"
+        elif 3500 <= temp < 5000:
+            if 0.08 < predlum < 0.6:
+                classification = "Main Sequence (K)"
+        elif 5000 <= temp < 6000:
+            if 0.6 < predlum < 1.5:
+                classification = "Main Sequence (G)"
+        elif 6000 <= temp < 7500:
+            if 1.5 < predlum < 5:
+                classification = "Main Sequence (F)"
+        elif 7500 <= temp < 10000:
+            if 5 < predlum < 25:
+                classification = "Main Sequence (A)"
+        elif 10000 <= temp < 30000:
+            if 25 < predlum < 10000:
+                classification = "Main Sequence (B)"
+        elif temp >= 30000:
+            if predlum > 10000:
+                classification = "Main Sequence (O)"
+
+            # Giants and Supergiants (high predicted luminosity, cooler temperature)
+        if predlum > 1000:
+            if temp < 6000:
+                classification = "Supergiant"
+            else:
+                classification = "Blue Supergiant"
+        elif predlum > 100:
+            if temp < 6000:
+                classification = "Giant"
+            else:
+                classification = "Blue Giant"
+
+            # White Dwarfs (low luminosity, high temperature)
+        if predlum < 0.01 and temp  > 8000:
+            classification = "White Dwarf"
+
+            # Subgiants (between main sequence and giants)
+        if 10 < predlum < 100 and temp < 8000:
+            classification = "Subgiant"
+
+        return classification
+
     def visualize_model(self, filename='trad_ml_model_results.png'):
         if self.y_pred is None:
             raise ValueError("Model has not been trained yet.")
@@ -528,7 +575,7 @@ class ClusterModel(MLModel):
         if self.y_pred is None:
             raise ValueError("Model has not been trained yet.")
 
-        fig = plt.figure(figsize=(18, 10))
+        fig = plt.figure(figsize=(20, 10))
         gs = fig.add_gridspec(2, 3, hspace=0.3, wspace=0.3)
 
         ax1 = fig.add_subplot(gs[0, 0])
