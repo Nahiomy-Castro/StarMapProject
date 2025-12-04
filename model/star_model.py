@@ -1,6 +1,9 @@
 #Necessary imports for all models
+import warnings
+
 import pandas as pd
 import numpy as np
+from pandas.errors import SettingWithCopyWarning
 from sklearn.cluster import KMeans
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
@@ -10,13 +13,22 @@ from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 import matplotlib.pyplot as plt
 import networkx as nx
 from abc import ABC, abstractmethod
+from pathlib import Path
+
+# Get the script's directory
+script_dir = Path(__file__).parent.parent
+
+# Build the path to your file
+file_path = script_dir / 'data' / 'hyg_v42_updated.csv'
+
+graph_path = script_dir / 'view'
 
 
 #Abstract base class for ML Models
 class MLModel(ABC):
     #Constructor includes filepath to be used along with the amount of rows
     #that will be used from the file
-    def __init__(self, csv_path="data/hyg_v42_updated.csv", nrows=None):
+    def __init__(self, csv_path=file_path, nrows=None):
 
         #If there is a given value of rows, read the file up until that row
         if nrows:
@@ -132,7 +144,7 @@ class MLModel(ABC):
 
 class TradModel(MLModel):
 
-    def __init__(self, csv_path="data/hyg_v42_updated.csv", nrows=30000):
+    def __init__(self, csv_path=file_path, nrows=30000):
         super().__init__(csv_path, nrows)
         self.required_features = ['mass', 'radius', 'temp', 'dist', 'absmag']
         self.target = 'lum'
@@ -176,7 +188,7 @@ class TradModel(MLModel):
         self.y_pred = self.model.predict(self.X_test)
 
     def input_predict(self, star_id):
-        stardata = pd.read_csv("data/hyg_v42_updated.csv")
+        stardata = pd.read_csv(file_path)
 
         star_row = stardata[stardata['id'].astype(str) == str(star_id)]
 
@@ -232,7 +244,7 @@ class TradModel(MLModel):
 
 class GraphModel(MLModel):
 
-    def __init__(self, csv_path="data/hyg_v42_updated.csv", nrows=30000, k_neighbors=5):
+    def __init__(self, csv_path=file_path, nrows=30000, k_neighbors=5):
         super().__init__(csv_path, nrows)
         self.required_features = ['ra', 'dec', 'mass', 'radius', 'temp', 'dist', 'absmag', 'lum']
         self.k_neighbors = k_neighbors
@@ -348,12 +360,12 @@ class GraphModel(MLModel):
 
         fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
-        sample_nodes = list(self.graph.nodes())[:100]
+        sample_nodes = list(self.graph.nodes())[:1000]
         subgraph = self.graph.subgraph(sample_nodes)
         pos = {node: (self.graph.nodes[node]['ra'], self.graph.nodes[node]['dec'])
                for node in subgraph.nodes()}
 
-        axes[0].set_title("Graph Structure (100 Stars)")
+        axes[0].set_title("Graph Structure (1000 Stars)")
         nx.draw_networkx_nodes(subgraph, pos, node_size=20, node_color='lightblue', ax=axes[0])
         nx.draw_networkx_edges(subgraph, pos, alpha=0.3, ax=axes[0])
         axes[0].set_xlabel('Right Ascension')
@@ -385,7 +397,7 @@ class GraphModel(MLModel):
 '''================================================================================================================================================================'''
 
 class ClusterModel(MLModel):
-    def __init__(self, csv_path="data/hyg_v42_updated.csv", nrows=30000, n_clusters=10):
+    def __init__(self, csv_path=file_path, nrows=30000, n_clusters=10):
         super().__init__(csv_path, nrows)
         self.required_features = ['mass', 'radius', 'temp', 'dist', 'ra', 'dec', 'absmag', 'lum']
         self.n_clusters = n_clusters
@@ -610,7 +622,7 @@ class ModelTrainer:
         self.strategy.get_featimp()
 
         # Visualize
-        filename = f"{self.strategy.__class__.__name__.lower()}_results.png"
+        filename = f"{graph_path}//{self.strategy.__class__.__name__.lower()}_results.png"
         self.strategy.visualize_model(filename)
 
         return results
@@ -620,12 +632,14 @@ class ModelTrainer:
 '''================================================================================================================================================================'''
 
 if __name__ == '__main__':
+    warnings.filterwarnings('ignore', category=SettingWithCopyWarning)
+
     # Strategy 1: Traditional ML
     print("\n" + "=" * 60)
     print("STRATEGY 1: TRADITIONAL ML MODEL")
     print("=" * 60)
 
-    traditional_model = TradModel(nrows=None)
+    traditional_model = TradModel(nrows=5000)
     trainer = ModelTrainer(traditional_model)
     results_traditional = trainer.run_training_pipeline()
 
@@ -634,7 +648,7 @@ if __name__ == '__main__':
     print("STRATEGY 2: GRAPH-BASED ML MODEL")
     print("=" * 60)
 
-    graph_model = GraphModel(nrows=None, k_neighbors=5)
+    graph_model = GraphModel(nrows=5000, k_neighbors=5)
     trainer.set_strategy(graph_model)
     results_graph = trainer.run_training_pipeline()
 
@@ -643,7 +657,7 @@ if __name__ == '__main__':
     print("STRATEGY 3: CLUSTER-BASED ML MODEL")
     print("=" * 60)
 
-    cluster_model = ClusterModel(nrows=None, n_clusters=10)
+    cluster_model = ClusterModel(nrows=5000, n_clusters=10)
     trainer.set_strategy(cluster_model)
     results_cluster = trainer.run_training_pipeline()
 
