@@ -232,6 +232,7 @@ class TradModel(MLModel):
             if predlum > 10000:
                 classification = "Main Sequence (O)"
 
+
             # Giants and Supergiants (high predicted luminosity, cooler temperature)
         if predlum > 1000:
             if temp < 6000:

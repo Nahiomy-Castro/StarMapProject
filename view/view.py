@@ -76,6 +76,7 @@ def main():
     predlum_val = traditional_model.input_predict(target.get("id"))
     st.write(f"**Predicted Luminosity:** {predlum_val:.5f} L☉")
 
+
     st.write(f"**True Luminosity:** {target['lum']} L☉")
 
     stel_class = traditional_model.stellar_classification(target['temp'], predlum_val)
