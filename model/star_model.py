@@ -1,6 +1,5 @@
-#Necessary imports for all models
+#Necessary imports for all models, polymorphism, and graphs
 import warnings
-
 import pandas as pd
 import numpy as np
 from pandas.errors import SettingWithCopyWarning
@@ -18,15 +17,16 @@ from pathlib import Path
 # Get the script's directory
 script_dir = Path(__file__).parent.parent
 
-# Build the path to your file
+# Uses the script directory to access the data csv file
 file_path = script_dir / 'data' / 'hyg_v42_updated.csv'
 
+# Uses the script directory to access the graphs created by the model
 graph_path = script_dir / 'view'
 
 
 #Abstract base class for ML Models
 class MLModel(ABC):
-    #Constructor includes filepath to be used along with the amount of rows
+    #Constructor includes filepath to the csv file to be used along with the amount of rows
     #that will be used from the file
     def __init__(self, csv_path=file_path, nrows=None):
 
@@ -45,10 +45,10 @@ class MLModel(ABC):
         self.y_pred = None #Predictions
         self.feature_names = [] #Features to be analyzed and learned from by the model
 
-    @abstractmethod
-    def execute_model(self):
-        pass
-        #Each model defines this
+    # @abstractmethod
+    # def execute_model(self):
+    #     pass
+    #     #Each model defines this
 
     @abstractmethod
     def set_data(self):
@@ -66,9 +66,10 @@ class MLModel(ABC):
             raise ValueError("Model has not been trained.")
 
         r2 = r2_score(self.y_test, self.y_pred) #How closely the model predictions align with the data
-        rmse = mean_squared_error(self.y_test, self.y_pred)
-        mae = mean_absolute_error(self.y_test, self.y_pred)
+        rmse = mean_squared_error(self.y_test, self.y_pred) #Average squared difference between predicted and true values
+        mae = mean_absolute_error(self.y_test, self.y_pred) #Average absolute difference between predicted and true values
 
+        # Show results
         print(f"\n{'=' * 60}")
         print(f"Model Evaluation Results:")
         print(f"{'=' * 60}")
@@ -77,56 +78,61 @@ class MLModel(ABC):
         print(f"  MAE: {mae:.4f}")
         print(f"{'=' * 60}")
 
+        # Returns a dictionary with the values for further use
         return {'r2': r2, 'rmse': rmse, 'mae': mae}
 
     def predict(self, input_data):
-        """
-        Predict luminosity for a single star or batch of stars.
 
-        Parameters:
-        -----------
-        input_data : dict or pd.DataFrame or np.array
-            Single row or multiple rows of star data
+        #Predict luminosity for a single star or group of stars.
 
-        Returns:
-        --------
-        float or np.array : Predicted luminosity value(s)
-        """
+        # Parameters:
+        #     input_data : dictionary or pd.DataFrame or np.array
+        #     Single row or multiple rows of star data
+
+        #Predictions can only be done if the model has been trained beforehand to make them
         if self.model is None:
             raise ValueError("Model has not been trained yet. Call train_model() first.")
 
+        #Predictions can only be carried out if the data has been normalized.
         if self.scaler is None:
             raise ValueError("Scaler not initialized. Call train_model() first.")
 
-        # Convert dict to array
+        # Convert dictionary to array
         if isinstance(input_data, dict):
             input_array = np.array([[input_data[feature] for feature in self.feature_names]])
         # Convert DataFrame to array
         elif isinstance(input_data, pd.DataFrame):
             input_array = input_data[self.feature_names].values
-        # Assume it's already an array
+        # Assume it's already an array if not a dictionary or df
         else:
             input_array = np.array(input_data).reshape(1, -1) if len(np.array(input_data).shape) == 1 else input_data
 
-        # Scale the input using the same scaler from training
+        # Scale the input using the same scaler from training (data normalization)
         input_scaled = self.scaler.transform(input_array)
 
         # Make prediction
         prediction = self.model.predict(input_scaled)
 
+        # Returns:
+        #   float or np.array: Predicted luminosity value(s)
         return prediction[0] if len(prediction) == 1 else prediction
 
 
     @abstractmethod
     def visualize_model(self, filename):
         pass
+        #Each model will define this
 
     def get_featimp(self):
+        # Used to hold a feature and it's importance
         feature_dict = None
 
+        #Model must be trained for feature importance to be measured
         if self.model is None:
             raise ValueError("Model has not been trained yet.")
 
+        # If the used model has feature importances, pair feature names with importance value
+        # and store it as a dictionary that will then be returned. Otherwise, leave it empty.
         if hasattr(self.model, 'feature_importances_'):
             print(f"\nFeature Importance:")
             for name, importance in zip(self.feature_names, self.model.feature_importances_):
@@ -142,61 +148,84 @@ class MLModel(ABC):
 '''================================================================================================================================================================'''
 '''================================================================================================================================================================'''
 
+# Traditional, straightforward ML Model. Used in the main project due to having the highest R² value.
+# This means that it possesses additional methods for this purpose relative to the other two models.
 class TradModel(MLModel):
 
-    def __init__(self, csv_path=file_path, nrows=30000):
-        super().__init__(csv_path, nrows)
-        self.required_features = ['mass', 'radius', 'temp', 'dist', 'absmag']
-        self.target = 'lum'
-        self.feature_names = self.required_features.copy()
+    def __init__(self, csv_path=file_path, nrows=None):
+        super().__init__(csv_path, nrows) #Obtains the csv filepath and the rows to be read from the base class
+        self.required_features = ['mass', 'radius', 'temp', 'dist', 'absmag'] #Features to be used in prediction
+        self.target = 'lum' #Target to be predicted
+        self.feature_names = self.required_features.copy() #Feature names
+        # (A copy of the features so the features themselves can be accessed without the names being affected.)
 
-    def execute_model(self):
-        print(f"\nExecuting Traditional ML Model...\n")
-        self.set_data()
-        self.train_model()
-        self.evaluate_model()
-        self.visualize_model()
-        self.get_featimp()
-        print('=='*60)
+    # def execute_model(self):
+    #     print(f"\nExecuting Traditional ML Model...\n") # Context
+    #     self.set_data()
+    #     self.train_model()
+    #     self.evaluate_model()
+    #     self.visualize_model()
+    #     self.get_featimp()
+    #     print('=='*60)
 
+    #Sets the data to be used
     def set_data(self):
-        print(f"\nPreparing data for Traditional ML Model...")
+        print(f"\nPreparing data for Traditional ML Model...") #Context
+        # Cleans the required features and the target so only fully valid stars can be used in the training process.
         cleandata = self.stardata.dropna(subset=self.required_features + [self.target])
 
-        print(f"  Stars after filtering: {len(cleandata)}")
+        print(f"  Stars after filtering: {len(cleandata)}") #Context
 
-        X = cleandata[self.required_features].values
-        y = cleandata[self.target].values
+        X = cleandata[self.required_features].values # Feature values
+        y = cleandata[self.target].values # Target values
 
+        # Splits the data into features and targets to be trained on and to be tested on.
+        # Uses 60/40 split for training and testing respectively
+        # Randomness seed is used to randomly pick which values are trained with and which are tested upon
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(X, y, test_size=0.4, random_state=42)
 
+        # Normalizes the features to be analyzed
         self.scaler = StandardScaler()
         self.X_train = self.scaler.fit_transform(self.X_train)
         self.X_test = self.scaler.transform(self.X_test)
 
+        #Context
         print(f"  Training set: {len(self.X_train)} stars")
         print(f"  Testing set: {len(self.X_test)} stars")
 
+    #Trains the model
     def train_model(self):
         if self.X_train is None:
-            self.set_data()
+            self.set_data() # Ensures the data is set
 
-        print(f"\nTraining Traditional Random Forest Model...")
+        print(f"\nTraining Traditional Random Forest Model...") #Context
+        # Uses the RandomForestRegressor model, 100 decision trees, random seed to ensure same results in different runs,
+        # uses all available CPU cores for speed (n_jobs=-1)
         self.model = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
+        # Trains the model on the data
         self.model.fit(self.X_train, self.y_train)
 
+        # Makes predictions based on the acquired training data
         self.y_pred = self.model.predict(self.X_test)
 
+    # Method exclusive to the TradModel due to its use in the main project.
     def input_predict(self, star_id):
+        # Reads the stardata
         stardata = pd.read_csv(file_path)
 
+        #Takes the ID of a given star as an input and turns it into a string
         star_row = stardata[stardata['id'].astype(str) == str(star_id)]
 
+        #If there is no ID, says the star has not been found
         if star_row.empty:
             raise ValueError(f"Star with ID {star_id} not found")
 
+        # Saves the chosen star as the one that first appears when a star is searched for.
+        # This is done in case ID digits overlap (Ex. 1246 & 5612467)
         star = star_row.iloc[0]
 
+        # Selects the following data from the star to be analyzed (It matches with the required features of the model)
+        # as a dictionary
         star_data = {
             'mass': star['mass'],
             'radius': star['radius'],
@@ -205,83 +234,94 @@ class TradModel(MLModel):
             'absmag': star['absmag']
         }
 
+        # Predicts the star using the class' predict method
         return self.predict(star_data)
 
-    def stellar_classification(self, temp, predlum):
-        classification = "Unclassified"
+    # Method exclusive to the TradModel due to its use in the main project.
+    # Classifies star based on temperature and luminosity (In theory should match the Hertzsprung-Russell diagram)
+    def stellar_classification(self, temp, lum):
 
+        # Defaults the classification to Unclassified
+        classification = "Unclassified (Data incomplete - Star may be classified in reality)"
+
+        # Each temp-lum range corresponds to a particular classification. This is used to designate a star.
         if 2500 <= temp < 3500:
-            if 0.0001 < predlum < 0.08:
+            if 0.0001 < lum < 0.08:
                 classification = "Main Sequence (M)"
         elif 3500 <= temp < 5000:
-            if 0.08 < predlum < 0.6:
+            if 0.08 < lum < 0.6:
                 classification = "Main Sequence (K)"
         elif 5000 <= temp < 6000:
-            if 0.6 < predlum < 1.5:
+            if 0.6 < lum < 1.5:
                 classification = "Main Sequence (G)"
         elif 6000 <= temp < 7500:
-            if 1.5 < predlum < 5:
+            if 1.5 < lum < 5:
                 classification = "Main Sequence (F)"
         elif 7500 <= temp < 10000:
-            if 5 < predlum < 25:
+            if 5 < lum < 25:
                 classification = "Main Sequence (A)"
         elif 10000 <= temp < 30000:
-            if 25 < predlum < 10000:
+            if 25 < lum < 10000:
                 classification = "Main Sequence (B)"
         elif temp >= 30000:
-            if predlum > 10000:
+            if lum > 10000:
                 classification = "Main Sequence (O)"
 
-
-            # Giants and Supergiants (high predicted luminosity, cooler temperature)
-        if predlum > 1000:
+        # Giants and Supergiants (high predicted luminosity, cooler temperature)
+        if lum > 1000:
             if temp < 6000:
                 classification = "Supergiant"
-            else:
+            elif temp >= 6000:
                 classification = "Blue Supergiant"
-        elif predlum > 100:
+        elif lum > 100:
             if temp < 6000:
                 classification = "Giant"
-            else:
+            elif temp >= 6000:
                 classification = "Blue Giant"
 
-            # White Dwarfs (low luminosity, high temperature)
-        if predlum < 0.01 and temp  > 8000:
+        # White Dwarfs (low luminosity, high temperature)
+        if lum < 0.01 and temp > 8000:
             classification = "White Dwarf"
 
-            # Subgiants (between main sequence and giants)
-        if 10 < predlum < 100 and temp < 8000:
+        # Subgiants (between main sequence and giants)
+        if 10 < lum < 100 and temp < 8000:
             classification = "Subgiant"
 
         return classification
 
-    def visualize_model(self, filename='trad_ml_model_results.png'):
+    # Visualizes the model's capabilities using various graphs
+    def visualize_model(self, filename='trad_ml_model_results.png'): #Saves graphs to a file
         if self.y_pred is None:
-            raise ValueError("Model has not been trained yet.")
+            raise ValueError("Model has not been trained yet.") #Ensures the model is trained
 
-        fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+        fig, axes = plt.subplots(1, 3, figsize=(18, 5)) #Plots 3 subplots in the main plot
 
-        axes[0].scatter(self.y_test, self.y_pred, alpha=0.5, s=20)
+        #Plot 1
+        axes[0].scatter(self.y_test, self.y_pred, alpha=0.5, s=20) # Plots points based on the predicted and true values
+        # Plots a line of perfect predictions (The closer the points are to it, the more accurate the prediction)
         axes[0].plot([self.y_test.min(), self.y_test.max()], [self.y_test.min(), self.y_test.max()], 'r--', lw=2)
         axes[0].set_xlabel('True Luminosity')
         axes[0].set_ylabel('Predicted Luminosity')
-        r2 = r2_score(self.y_test, self.y_pred)
+        r2 = r2_score(self.y_test, self.y_pred) # R² value
         axes[0].set_title(f'Traditional ML Model (R² = {r2:.4f})')
         axes[0].grid(True, alpha=0.3)
 
-        axes[1].barh(self.feature_names, self.model.feature_importances_)
+        #Plot 2
+        axes[1].barh(self.feature_names, self.model.feature_importances_) # Feature importances
         axes[1].set_xlabel('Importance')
         axes[1].set_title('Feature Importance')
         axes[1].grid(True, alpha=0.3)
 
-        residuals = self.y_test - self.y_pred
-        axes[2].scatter(self.y_pred, residuals, alpha=0.5, s=20)
-        axes[2].axhline(y=0, color='r', linestyle='--', lw=2)
+        #Plot 3
+        residuals = self.y_test - self.y_pred # Shows the errors in the model (Overprediction or Underprediction)
+        axes[2].scatter(self.y_pred, residuals, alpha=0.5, s=20) # Plots predictions and if it overpredicted or underpredicted
+        axes[2].axhline(y=0, color='r', linestyle='--', lw=2) # Line of perfect predictions
         axes[2].set_xlabel('Predicted Luminosity')
         axes[2].set_ylabel('Residuals')
         axes[2].set_title('Residual Plot')
         axes[2].grid(True, alpha=0.3)
 
+        # Makes sure the graph is well-organized and saves it.
         plt.tight_layout()
         plt.savefig(filename, dpi=300, bbox_inches='tight')
 
@@ -291,23 +331,25 @@ class TradModel(MLModel):
 '''================================================================================================================================================================'''
 
 class GraphModel(MLModel):
+    #All aspects not explicitly explained are such because they have been explained in the previous model
 
-    def __init__(self, csv_path=file_path, nrows=30000, k_neighbors=5):
+    #K-Neighbors are the 5 closest neighbors in terms of value similarity
+    def __init__(self, csv_path=file_path, nrows=None, k_neighbors=5):
         super().__init__(csv_path, nrows)
         self.required_features = ['ra', 'dec', 'mass', 'radius', 'temp', 'dist', 'absmag', 'lum']
         self.k_neighbors = k_neighbors
         self.graph = None
-        self.feature_names = ['mass', 'radius', 'temp', 'dist', 'absmag', 'neighbor_mass_avg', 'neighbor_radius_avg', 'neighbor_temp_avg',
-                              'neighbor_dist_avg', 'neighbor_absmag_avg']
+        # Certain features will be added by the model itself, so their names are specified here.
+        self.feature_names = ['mass', 'radius', 'temp', 'absmag', 'neighbor_mass_avg', 'neighbor_radius_avg', 'neighbor_temp_avg', 'neighbor_absmag_avg']
 
-    def execute_model(self):
-        print(f"\nExecuting NetworkX Graph-based ML Model...\n")
-        self.set_data()
-        self.train_model()
-        self.evaluate_model()
-        self.visualize_model()
-        self.get_featimp()
-        print('=='*60)
+    # def execute_model(self):
+    #     print(f"\nExecuting NetworkX Graph-based ML Model...\n")
+    #     self.set_data()
+    #     self.train_model()
+    #     self.evaluate_model()
+    #     self.visualize_model()
+    #     self.get_featimp()
+    #     print('=='*60)
 
 
     def set_data(self):
@@ -318,8 +360,9 @@ class GraphModel(MLModel):
         print(f"  Stars after filtering: {len(cleandata)}")
 
         print(f"  Building spatial graph (k={self.k_neighbors} neighbors)...")
-        self.graph = nx.Graph()
+        self.graph = nx.Graph() # Creates a graph using NetworkX
 
+        # Adds various nodes to the graph, each representing a star and it's required features
         for index, row in cleandata.iterrows():
             self.graph.add_node(index,
                                 mass=row['mass'],
@@ -332,7 +375,8 @@ class GraphModel(MLModel):
                                 dec=row['dec']
                                 )
 
-        coords = cleandata[['ra', 'dec']].values
+        #Sets it's coordinates in space
+        coords = cleandata[['ra', 'dec', 'dist']].values
         nbrs = NearestNeighbors(n_neighbors=self.k_neighbors + 1, algorithm='ball_tree').fit(coords)
         distances, indices = nbrs.kneighbors(coords)
 
@@ -355,7 +399,7 @@ class GraphModel(MLModel):
                 self.graph.nodes[node]['mass'],
                 self.graph.nodes[node]['radius'],
                 self.graph.nodes[node]['temp'],
-                self.graph.nodes[node]['dist'],
+                #self.graph.nodes[node]['dist'],
                 self.graph.nodes[node]['absmag']
             ]
 
@@ -365,14 +409,14 @@ class GraphModel(MLModel):
                 neighbor_masses = [self.graph.nodes[n]['mass'] for n in neighbors]
                 neighbor_radii = [self.graph.nodes[n]['radius'] for n in neighbors]
                 neighbor_temps = [self.graph.nodes[n]['temp'] for n in neighbors]
-                neighbor_dist = [self.graph.nodes[n]['dist'] for n in neighbors]
+                #neighbor_dist = [self.graph.nodes[n]['dist'] for n in neighbors]
                 neighbor_absmag = [self.graph.nodes[nodes]['absmag'] for nodes in neighbors]
 
                 features.extend([
                     np.mean(neighbor_masses),
                     np.mean(neighbor_radii),
                     np.mean(neighbor_temps),
-                    np.mean(neighbor_dist),
+                    #np.mean(neighbor_dist),
                     np.mean(neighbor_absmag)
                 ])
             else:
@@ -408,7 +452,7 @@ class GraphModel(MLModel):
 
         fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
-        sample_nodes = list(self.graph.nodes())[:1000]
+        sample_nodes = list(self.graph.nodes())[:100]
         subgraph = self.graph.subgraph(sample_nodes)
         pos = {node: (self.graph.nodes[node]['ra'], self.graph.nodes[node]['dec'])
                for node in subgraph.nodes()}
@@ -456,14 +500,14 @@ class ClusterModel(MLModel):
                               'cluster_avg_ra', 'cluster_avg_dec', 'cluster_avg_absmag']
 
 
-    def execute_model(self):
-        print(f"\nExecuting NetworkX Graph-based ML Model...\n")
-        self.set_data()
-        self.train_model()
-        self.evaluate_model()
-        self.visualize_model()
-        self.get_featimp()
-        print('==' * 60)
+    # def execute_model(self):
+    #     print(f"\nExecuting NetworkX Graph-based ML Model...\n")
+    #     self.set_data()
+    #     self.train_model()
+    #     self.evaluate_model()
+    #     self.visualize_model()
+    #     self.get_featimp()
+    #     print('==' * 60)
 
 
     def set_data(self):
@@ -577,7 +621,7 @@ class ClusterModel(MLModel):
             raise ValueError("Model has not been trained yet.")
 
         fig = plt.figure(figsize=(20, 10))
-        gs = fig.add_gridspec(2, 3, hspace=0.3, wspace=0.3)
+        gs = fig.add_gridspec(2, 3, hspace=0.3, wspace=0.5)
 
         ax1 = fig.add_subplot(gs[0, 0])
 

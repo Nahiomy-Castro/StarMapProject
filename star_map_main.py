@@ -16,7 +16,11 @@ def import_from_path(module_name, path):
 
 # Load the Streamlit UI from view/view.py
 View = import_from_path("view", os.path.join(PROJECT_ROOT, "view", "view.py"))
+StarModel = import_from_path("star_model", os.path.join(PROJECT_ROOT, "model", "star_model.py"))
 
 # Run the Streamlit app
 if __name__ == "__main__":
-    View.main()
+    traditional_model = StarModel.TradModel(nrows=5000)
+    trainer = StarModel.ModelTrainer(traditional_model)
+    trainer.run_training_pipeline()
+    View.view(traditional_model)

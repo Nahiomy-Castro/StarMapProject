@@ -18,10 +18,9 @@ StarData = import_from_path("star_data", os.path.join(PROJECT_ROOT, "model", "st
 ConstellationData = import_from_path("constellation_data", os.path.join(PROJECT_ROOT, "model", "constellation_data.py")).ConstellationData
 Controller = import_from_path("controller", os.path.join(PROJECT_ROOT, "controller", "controller.py")).Controller
 StarsFactory = import_from_path("stars_factory", os.path.join(PROJECT_ROOT, "model", "stars_factory.py")).StarsFactory
-StarModel = import_from_path("star_model", os.path.join(PROJECT_ROOT, "model", "star_model.py"))
 
 
-def main():
+def view(train_model):
     st.title("⭐ Star Atlas")
     st.divider()
 
@@ -73,17 +72,18 @@ def main():
     st.write(f"**Temperature:** {target['temp']} K")
     st.write(f"**Constellation:** {target['con']}")
 
-    predlum_val = traditional_model.input_predict(target.get("id"))
+    predlum_val = train_model.input_predict(target.get("id"))
     st.write(f"**Predicted Luminosity:** {predlum_val:.5f} L☉")
-
 
     st.write(f"**True Luminosity:** {target['lum']} L☉")
 
-    stel_class = traditional_model.stellar_classification(target['temp'], predlum_val)
-    st.write(f"**Stellar Classification:** {stel_class}")
+    predstel_class = train_model.stellar_classification(target['temp'], predlum_val)
+    st.write(f"**Predicted Stellar Classification:** {predstel_class}")
+
+    stel_class = train_model.stellar_classification(target['temp'], target['lum'])
+    st.write(f"**True Stellar Classification:** {stel_class}")
+
+
 
 if __name__ == "__main__":
-    traditional_model = StarModel.TradModel(nrows=5000)
-    trainer = StarModel.ModelTrainer(traditional_model)
-    trainer.run_training_pipeline()
-    main()
+    view()
