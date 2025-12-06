@@ -1,3 +1,11 @@
+tqdm
+astroquery
+networkx
+matplotlib
+scikit-learn
+mariadb
+sqlalchemy
+astropy
 plotly
 numpy
 pandas

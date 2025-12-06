@@ -9,7 +9,6 @@ if MODEL_DIR not in sys.path:
     sys.path.append(MODEL_DIR)
 
 from model.stars_factory import StarsFactory
-from model.star_model import TradModel, ModelTrainer
 
 class Controller:
     def __init__(self, star_model, const_model):
@@ -29,16 +28,13 @@ class Controller:
         self.star_model.recenter(cx, cy, cz)
         filtered = self.star_model.filter_distance(max_distance_pc)
 
-        # scale
-        scale_factor = 20
-        filtered['cx_scaled'] = filtered['cx'] * scale_factor
-        filtered['cy_scaled'] = filtered['cy'] * scale_factor
-        filtered['cz_scaled'] = filtered['cz'] * scale_factor
+        filtered['cx_scaled'] = filtered['cx']
+        filtered['cy_scaled'] = filtered['cy']
+        filtered['cz_scaled'] = filtered['cz']
 
         return filtered
 
     def build_plot(self, stars_filtered):
-        # Just delegate plot creation to the factory
         return StarsFactory.create_plot(
             "constellations",
             stars_filtered,
