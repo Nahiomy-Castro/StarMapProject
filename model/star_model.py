@@ -45,11 +45,6 @@ class MLModel(ABC):
         self.y_pred = None #Predictions
         self.feature_names = [] #Features to be analyzed and learned from by the model
 
-    # @abstractmethod
-    # def execute_model(self):
-    #     pass
-    #     #Each model defines this
-
     @abstractmethod
     def set_data(self):
         pass
@@ -159,14 +154,6 @@ class TradModel(MLModel):
         self.feature_names = self.required_features.copy() #Feature names
         # (A copy of the features so the features themselves can be accessed without the names being affected.)
 
-    # def execute_model(self):
-    #     print(f"\nExecuting Traditional ML Model...\n") # Context
-    #     self.set_data()
-    #     self.train_model()
-    #     self.evaluate_model()
-    #     self.visualize_model()
-    #     self.get_featimp()
-    #     print('=='*60)
 
     #Sets the data to be used
     def set_data(self):
@@ -331,9 +318,9 @@ class TradModel(MLModel):
 '''================================================================================================================================================================'''
 
 class GraphModel(MLModel):
-    #All aspects not explicitly explained are such because they have been explained in the previous model
+    # All aspects not explicitly explained are such because they have been explained in the previous model
 
-    #K-Neighbors are the 5 closest neighbors in terms of value similarity
+    #K-Neighbors are the 5 closest neighbors in 3D space
     def __init__(self, csv_path=file_path, nrows=None, k_neighbors=5):
         super().__init__(csv_path, nrows)
         self.required_features = ['ra', 'dec', 'mass', 'radius', 'temp', 'dist', 'absmag', 'lum']
@@ -342,14 +329,6 @@ class GraphModel(MLModel):
         # Certain features will be added by the model itself, so their names are specified here.
         self.feature_names = ['mass', 'radius', 'temp', 'absmag', 'neighbor_mass_avg', 'neighbor_radius_avg', 'neighbor_temp_avg', 'neighbor_absmag_avg']
 
-    # def execute_model(self):
-    #     print(f"\nExecuting NetworkX Graph-based ML Model...\n")
-    #     self.set_data()
-    #     self.train_model()
-    #     self.evaluate_model()
-    #     self.visualize_model()
-    #     self.get_featimp()
-    #     print('=='*60)
 
 
     def set_data(self):
@@ -375,11 +354,14 @@ class GraphModel(MLModel):
                                 dec=row['dec']
                                 )
 
-        #Sets it's coordinates in space
+        # Sets its coordinates in space (x, y, z)
         coords = cleandata[['ra', 'dec', 'dist']].values
+
+        # Finds the nearest neighbors to each given star using the coordinates
         nbrs = NearestNeighbors(n_neighbors=self.k_neighbors + 1, algorithm='ball_tree').fit(coords)
         distances, indices = nbrs.kneighbors(coords)
 
+        # Adds edges between neighbors based on how close they are to each other in 3D space
         for i, neighbors in enumerate(indices):
             for j, neighbor_index in enumerate(neighbors[1:]):  # Skip self
                 if i < neighbor_index:  # Avoid duplicate edges
@@ -388,7 +370,7 @@ class GraphModel(MLModel):
 
         print(f"  Graph: {self.graph.number_of_nodes()} nodes, {self.graph.number_of_edges()} edges")
 
-        # Extract features from graph
+        # Obtains node features from the graph
         print(f"  Extracting features from graph...")
 
         node_features = []
@@ -399,32 +381,34 @@ class GraphModel(MLModel):
                 self.graph.nodes[node]['mass'],
                 self.graph.nodes[node]['radius'],
                 self.graph.nodes[node]['temp'],
-                #self.graph.nodes[node]['dist'],
                 self.graph.nodes[node]['absmag']
             ]
 
-            # Add neighborhood aggregation features
+            # Adds neighborhood aggregation features as a list
             neighbors = list(self.graph.neighbors(node))
             if neighbors:
                 neighbor_masses = [self.graph.nodes[n]['mass'] for n in neighbors]
                 neighbor_radii = [self.graph.nodes[n]['radius'] for n in neighbors]
                 neighbor_temps = [self.graph.nodes[n]['temp'] for n in neighbors]
-                #neighbor_dist = [self.graph.nodes[n]['dist'] for n in neighbors]
                 neighbor_absmag = [self.graph.nodes[nodes]['absmag'] for nodes in neighbors]
 
                 features.extend([
                     np.mean(neighbor_masses),
                     np.mean(neighbor_radii),
                     np.mean(neighbor_temps),
-                    #np.mean(neighbor_dist),
                     np.mean(neighbor_absmag)
                 ])
             else:
-                features.extend([0.0, 0.0, 0.0, 0.0, 0.0])
+                features.extend([0.0, 0.0, 0.0, 0.0])
 
+            # Adds individual and neighborhood features to the empty feature array to
+            # create an array with all the necessary data for prediction.
+            # Fills the target array with the lum value of every node.
             node_features.append(features)
             node_targets.append(self.graph.nodes[node]['lum'])
 
+        # Undergoes the main data setting process, splitting the data into training and testing sets and scaling the
+        # data for normalization.
         X = np.array(node_features)
         y = np.array(node_targets)
 
@@ -439,6 +423,7 @@ class GraphModel(MLModel):
         if self.graph is None:
             self.set_data()
 
+        # Trains the data much in the same way the previous model did.
         print(f"\nTraining Graph-Based Random Forest Model...")
         self.model = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
         self.model.fit(self.X_train, self.y_train)
@@ -452,18 +437,20 @@ class GraphModel(MLModel):
 
         fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
-        sample_nodes = list(self.graph.nodes())[:100]
+        # The first graph is a plotting of 500 stars from the NetworkX graph and their distance based edges.
+        # Its purpose is to show the network of connections that the model used to make its predictions.
+        sample_nodes = list(self.graph.nodes())[:500]
         subgraph = self.graph.subgraph(sample_nodes)
         pos = {node: (self.graph.nodes[node]['ra'], self.graph.nodes[node]['dec'])
                for node in subgraph.nodes()}
 
-        axes[0].set_title("Graph Structure (1000 Stars)")
+        axes[0].set_title("Graph Structure (500 Stars)")
         nx.draw_networkx_nodes(subgraph, pos, node_size=20, node_color='lightblue', ax=axes[0])
         nx.draw_networkx_edges(subgraph, pos, alpha=0.3, ax=axes[0])
         axes[0].set_xlabel('Right Ascension')
         axes[0].set_ylabel('Declination')
 
-
+        # R² Graph
         axes[1].scatter(self.y_test, self.y_pred, alpha=0.5, s=20)
         axes[1].plot([self.y_test.min(), self.y_test.max()],
                      [self.y_test.min(), self.y_test.max()], 'r--', lw=2)
@@ -473,7 +460,7 @@ class GraphModel(MLModel):
         axes[1].set_title(f'Graph-Based Model (R² = {r2:.4f})')
         axes[1].grid(True, alpha=0.3)
 
-
+        # Feature importance graph
         axes[2].barh(self.feature_names, self.model.feature_importances_)
         axes[2].set_xlabel('Importance')
         axes[2].set_title('Feature Importance')
@@ -481,8 +468,6 @@ class GraphModel(MLModel):
 
         plt.tight_layout()
         plt.savefig(filename, dpi=300, bbox_inches='tight')
-
-        #nx.write_gpickle(self.graph, 'stellar_luminosity_graph.gpickle')
 
 '''================================================================================================================================================================'''
 '''================================================================================================================================================================'''
@@ -492,37 +477,33 @@ class ClusterModel(MLModel):
     def __init__(self, csv_path=file_path, nrows=30000, n_clusters=10):
         super().__init__(csv_path, nrows)
         self.required_features = ['mass', 'radius', 'temp', 'dist', 'ra', 'dec', 'absmag', 'lum']
-        self.n_clusters = n_clusters
+        self.n_clusters = n_clusters # Sets the amount of clusters it will split stars into
         self.cluster_model = None
         self.cluster_labels = None
+        # Names of the required data, including data created by the model itself
         self.feature_names = ['mass', 'radius', 'temp', 'dist', 'ra', 'dec', 'absmag', 'cluster_id',
                               'cluster_avg_mass', 'cluster_avg_radius', 'cluster_avg_temp', 'cluster_avg_dist',
                               'cluster_avg_ra', 'cluster_avg_dec', 'cluster_avg_absmag']
 
 
-    # def execute_model(self):
-    #     print(f"\nExecuting NetworkX Graph-based ML Model...\n")
-    #     self.set_data()
-    #     self.train_model()
-    #     self.evaluate_model()
-    #     self.visualize_model()
-    #     self.get_featimp()
-    #     print('==' * 60)
 
 
     def set_data(self):
 
         print(f"\nPreparing data for Cluster-Based ML Model...")
 
+        # Cleans the data much like the previous models did
         cleandata = self.stardata.dropna(subset=self.required_features).reset_index(drop=True)
 
         print(f"  Stars after filtering: {len(cleandata)}")
 
         clustering_features = cleandata[['mass', 'radius', 'temp', 'dist', 'ra', 'dec', 'absmag']].values
 
+        # Scales the data for normalization
         scaler_cluster = StandardScaler()
         clustering_features_scaled = scaler_cluster.fit_transform(clustering_features)
 
+        # Groups the stars into clusters based on feature similarities
         print(f"  Performing K-Means clustering (k={self.n_clusters})...")
         self.cluster_model = KMeans(n_clusters=self.n_clusters, random_state=42, n_init=10)
         self.cluster_labels = self.cluster_model.fit_predict(clustering_features_scaled)

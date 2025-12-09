@@ -1,9 +1,6 @@
-"""
-mast_bulk_xmatch.py - Fixed Version
-Performs a bulk crossmatch of hyg_v42.csv against the TIC catalog on MAST.
-Uses batch queries with rate limiting for reliability.
-"""
+# Bulk crossmatch of hyg_v42.csv against the TIC catalog on MAST.
 
+# Necessary imports
 import pandas as pd
 import numpy as np
 import math
@@ -13,7 +10,7 @@ from astropy.coordinates import SkyCoord
 from astropy import units as u
 from tqdm import tqdm
 
-# --- CONFIG ---
+# Essential Data
 INPUT_CSV = "hyg_v42.csv"
 OUTPUT_CSV = "hyg_v42_updated.csv"
 SEARCH_RADIUS_ARCSEC = 30
@@ -22,9 +19,9 @@ EPOCH_TIC = 2015.5
 YEARS = EPOCH_TIC - EPOCH_HYG
 BATCH_SIZE = 100  # Process in batches to avoid timeouts
 
-# TEST MODE: Set to a number to process only first N rows (e.g., 10 for testing)
+# Set limit to a number (N) to process only first N rows
 # Set to None to process all rows
-TEST_LIMIT = None  # Change to None for full run
+TEST_LIMIT = None
 
 # Column names in your HYG file
 COL_RA = "ra"
@@ -34,9 +31,9 @@ COL_PMDEC = "pmdec"
 
 
 def pm_propagate(ra_deg, dec_deg, pmra_masyr, pmdec_masyr, years=YEARS):
-    """
-    Propagate (RA,Dec) from epoch 2000.0 to epoch 2015.5 using proper motion.
-    """
+
+    # Propagate (RA,Dec) from epoch 2000.0 to epoch 2015.5 using proper motion.
+
     try:
         if np.isnan(pmra_masyr) or np.isnan(pmdec_masyr):
             return ra_deg, dec_deg
@@ -53,10 +50,10 @@ def pm_propagate(ra_deg, dec_deg, pmra_masyr, pmdec_masyr, years=YEARS):
 
 
 def query_tic_cone(ra, dec, radius_arcsec=SEARCH_RADIUS_ARCSEC):
-    """
-    Query TIC catalog for a single coordinate using cone search.
-    Returns the closest match within radius.
-    """
+
+    # Query TIC catalog for a single coordinate using cone search.
+    # Returns the closest match within radius.
+
     try:
         coord = SkyCoord(ra=ra*u.deg, dec=dec*u.deg, frame='icrs')
         result = Catalogs.query_region(
@@ -94,9 +91,9 @@ def query_tic_cone(ra, dec, radius_arcsec=SEARCH_RADIUS_ARCSEC):
 
 
 def run_bulk_crossmatch(input_csv_path, output_csv_path):
-    """
-    Main crossmatch function using batched cone searches.
-    """
+
+    # Crossmatch function using batched cone searches.
+
     # Load input CSV
     stardata = pd.read_csv(input_csv_path)
     print(f"Loaded {len(stardata)} rows from {input_csv_path}")
@@ -166,22 +163,6 @@ def run_bulk_crossmatch(input_csv_path, output_csv_path):
     print(f"Output saved to: {output_csv_path}")
 
     return output_csv_path
-
-
-def run_batch_crossmatch_alternative(input_csv_path, output_csv_path):
-    """
-    Alternative method using Catalogs.query_criteria for batch processing.
-    Use this if the cone search method is too slow.
-    """
-    stardata = pd.read_csv(input_csv_path)
-    print(f"Loaded {len(stardata)} rows from {input_csv_path}")
-
-    # This method queries larger regions and filters locally
-    # Useful for clustered data
-    print("Note: This is a faster alternative for large datasets with clustered positions")
-    print("Using the standard cone search method instead (more accurate)...")
-
-    return run_bulk_crossmatch(input_csv_path, output_csv_path)
 
 
 if __name__ == "__main__":
