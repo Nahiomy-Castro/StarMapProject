@@ -192,7 +192,7 @@ def view(train_model):
         st.write(f"**HR:** {nan_hider(target['hr'])}")
         st.write(f"**GL:** {nan_hider(target['gl'])}")
         st.write(f"**Distance (pc):** {nan_hider(target['dist'])}")
-        predlum_val = train_model.input_predict(target.get("id"))
+        predlum_val = train_model.input_predict(target.get("id")) # Predicts luminosity
         st.markdown(f":blue-background[**Predicted Luminosity:**] {predlum_val:.5f} L☉")
         st.markdown(f":blue-background[**True Luminosity:**] {target['lum']} L☉")
 
@@ -206,8 +206,10 @@ def view(train_model):
         st.write(f"**Temperature:** {nan_hider(target['temp'])} K")
         st.write(f"**Constellation:** {nan_hider(target['con'])}")
 
+        # Predicts Stellar Class using Predlum
         predstel_class = train_model.stellar_classification(target['temp'], predlum_val)
         st.markdown(f":blue-background[**Predicted Stellar Classification:**] {predstel_class}")
+        # Predicts Stellar Class using Lum
         stel_class = train_model.stellar_classification(target['temp'], target['lum'])
         st.markdown(f":blue-background[**True Stellar Classification:**] {stel_class}")
         # Note that everything highlighter belongs to the traditional model trained to display the information.

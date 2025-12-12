@@ -34,16 +34,27 @@ StarModel = import_from_path("star_model", os.path.join(PROJECT_ROOT, "model", "
 # Run the Streamlit app
 if __name__ == "__main__":
 
+    # Initializes the graph model
     graph_model = GraphModel(nrows=5000, k_neighbors=5)
+    # Initializes the Strategy Pattern ModelTrainer with the graph model
     trainer = StarModel.ModelTrainer(graph_model)
+    # Runs the graph model pipeline
     trainer.run_training_pipeline()
 
+    # Initializes the cluster model
     cluster_model = ClusterModel(nrows=5000, n_clusters=10)
+    # Changes the strategy to the cluster model
     trainer.set_strategy(cluster_model)
+    # Runs the cluster model pipeline
     trainer.run_training_pipeline()
 
+    # Initializes the traditional model
     traditional_model = StarModel.TradModel(nrows=5000)
+    # Changes the strategy to the traditional model
     trainer.set_strategy(traditional_model)
+    # Runs the traditional model pipeline
     trainer.run_training_pipeline()
 
+    # Calls the view method to start the program.
+    # It takes the traditional model as a parameter so the view method can predict the necessary values.
     View.view(traditional_model)

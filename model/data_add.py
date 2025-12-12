@@ -1,5 +1,13 @@
 # Bulk crossmatch of hyg_v42.csv against the TIC catalog on MAST.
 
+# In summary, this script :
+    # 1) Syncs the epochs between the HYG database and the TIC to make sure the stars are in the same celestial coordinates.
+    # 2) For each star in the database, it performs a cone search around the ooordinates (RA, Dec) with a 30 arcsecond radius.
+    # 3) If it finds a TIC object in the area, it assigns it's mass, radius, temperature and TIC ID to the corresponding star.
+    # 4) If multiple TIC objects are found, it selects the closest one.
+    # 5) Since the Sun isn't a TIC object, it is handled as a special case with its known values hardcoded in.
+
+
 # Necessary imports
 import pandas as pd
 import numpy as np
@@ -24,15 +32,16 @@ BATCH_SIZE = 100  # Process in batches to avoid timeouts
 TEST_LIMIT = None
 
 # Column names in your HYG file
-COL_RA = "ra"
-COL_DEC = "dec"
-COL_PMRA = "pmra"
-COL_PMDEC = "pmdec"
+COL_RA = "ra" # Right Ascension
+COL_DEC = "dec" # Declination
+COL_PMRA = "pmra" # Proper Motion Right Asencion
+COL_PMDEC = "pmdec" # Proper Motion Declination
 
 
 def pm_propagate(ra_deg, dec_deg, pmra_masyr, pmdec_masyr, years=YEARS):
 
     # Propagate (RA,Dec) from epoch 2000.0 to epoch 2015.5 using proper motion.
+    # mas/yr = milliarcseconds per year
 
     try:
         if np.isnan(pmra_masyr) or np.isnan(pmdec_masyr):
@@ -67,7 +76,7 @@ def query_tic_cone(ra, dec, radius_arcsec=SEARCH_RADIUS_ARCSEC):
 
         # Get the closest match
         if len(result) > 1:
-            # Calculate distances and get closest
+            # Calculate distances and get the closest star
             result_coords = SkyCoord(
                 ra=result['ra']*u.deg,
                 dec=result['dec']*u.deg,
@@ -126,16 +135,6 @@ def run_bulk_crossmatch(input_csv_path, output_csv_path):
     # Query TIC in batches with progress bar
     print(f"Querying TIC catalog for {len(stardata)} objects (batch size: {BATCH_SIZE})...")
     for i in tqdm(range(len(stardata)), desc="Crossmatching"):
-        # Check if this is the Sun (Sol)
-        star_name = stardata.at[i, 'proper'] if 'proper' in stardata.columns else ''
-
-        if star_name == 'Sol':
-            # Set Sun's values directly (no need to text_input)
-            stardata.at[i, 'tic'] = None  # Sun doesn't have a TIC entry
-            stardata.at[i, 'mass'] = 1.0
-            stardata.at[i, 'radius'] = 1.0
-            stardata.at[i, 'temp'] = 5772.0
-            continue
 
         ra_prop, dec_prop = propagated_coords[i]
 
@@ -147,6 +146,17 @@ def run_bulk_crossmatch(input_csv_path, output_csv_path):
             stardata.at[i, 'mass'] = match['mass']
             stardata.at[i, 'radius'] = match['radius']
             stardata.at[i, 'temp'] = match['temp']
+
+        # Check if this is the Sun (Sol)
+        star_name = stardata.at[i, 'proper'] if 'proper' in stardata.columns else ''
+
+        if star_name == 'Sol':
+            # Set Sun's values directly (no need to text_input)
+            stardata.at[i, 'tic'] = None  # Sun doesn't have a TIC entry
+            stardata.at[i, 'mass'] = 1.0
+            stardata.at[i, 'radius'] = 1.0
+            stardata.at[i, 'temp'] = 5772.0
+
 
         # Rate limiting: pause every BATCH_SIZE queries
         if (i + 1) % BATCH_SIZE == 0:
@@ -166,12 +176,13 @@ def run_bulk_crossmatch(input_csv_path, output_csv_path):
 
 
 if __name__ == "__main__":
+
     try:
         # Test network connectivity first
         print("Testing MAST connectivity...")
         test_coord = SkyCoord(ra=10*u.deg, dec=20*u.deg)
         test_result = Catalogs.query_region(test_coord, radius=1*u.arcsec, catalog="TIC")
-        print("✓ Connection to MAST successful\n")
+        print("Connection to MAST successful\n")
 
         # Run crossmatch
         out = run_bulk_crossmatch(INPUT_CSV, OUTPUT_CSV)
@@ -179,10 +190,4 @@ if __name__ == "__main__":
 
     except Exception as e:
         print(f"\nError: {e}")
-        print("\nTroubleshooting steps:")
-        print("1. Check internet connection")
-        print("2. Verify astroquery version: pip install --upgrade astroquery")
-        print("3. Check if MAST services are online: https://mast.stsci.edu/")
-        print("4. Try clearing astroquery cache:")
-        print("   from astroquery.utils import cache; cache.clear_cache()")
         raise

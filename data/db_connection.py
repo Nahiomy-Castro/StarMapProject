@@ -2,6 +2,10 @@ from astropy.table import Table
 import sqlalchemy as sqal
 import mariadb
 
+# None of the MariaDB information is relevant to the project itself. It is exclusively for the benefit of
+# the developers so that we could use HeidiSQL to easily confirm if our data in the main project was correct
+# via the use of SQL queries.
+
 def create_MariaDB():
     DB_CONFIG = {
         "host": "localhost",

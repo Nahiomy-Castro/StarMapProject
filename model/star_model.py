@@ -503,13 +503,16 @@ class ClusterModel(MLModel):
         scaler_cluster = StandardScaler()
         clustering_features_scaled = scaler_cluster.fit_transform(clustering_features)
 
-        # Groups the stars into clusters based on feature similarities
+        # Groups the stars into clusters based on feature similarities. This serves as the first ML process in this model.
         print(f"  Performing K-Means clustering (k={self.n_clusters})...")
         self.cluster_model = KMeans(n_clusters=self.n_clusters, random_state=42, n_init=10)
         self.cluster_labels = self.cluster_model.fit_predict(clustering_features_scaled)
 
+        # Creates cluster column and assigns each star to a cluster based on the previous prediction.
         cleandata['cluster'] = self.cluster_labels
 
+        # Groups the stars by cluster and calculates the cluster averages along with using luminosity to create a
+        # star count per cluster.
         cluster_stats = cleandata.groupby('cluster').agg({
             'mass': 'mean',
             'radius': 'mean',
@@ -521,9 +524,12 @@ class ClusterModel(MLModel):
             'lum': ['mean', 'count']
         })
 
+        # Context regarding cluster statistics.
         print(f"\n  Cluster Statistics:")
         print(f"  {'Cluster':<10} {'Count':<8} {'Avg Mass':<12} {'Avg Radius':<12} {'Avg Temp':<12}")
         print(f"  {'-' * 70}")
+
+        # Obtains the average statistics from each cluster
         for i in range(self.n_clusters):
             count = cluster_stats.loc[i, ('lum', 'count')]
             avg_mass = cluster_stats.loc[i, ('mass', 'mean')]
@@ -533,16 +539,21 @@ class ClusterModel(MLModel):
             avg_ra = cluster_stats.loc[i, ('ra', 'mean')]
             avg_dec = cluster_stats.loc[i, ('dec', 'mean')]
             avg_absmag = cluster_stats.loc[i, ('absmag', 'mean')]
+
+            # Context given to user in the form of a dataframe
             print(f"  {i:<10} {int(count):<8} {avg_mass:<12.3f} {avg_radius:<12.3f} {avg_temp:<12.1f} "
                   f"{avg_dist:<12.2f} {avg_ra:<12.2f} {avg_dec:<12.2f} {avg_absmag:<12.2f}")
 
+        # Empty lists to hold all the node features and targets
         node_features = []
         node_targets = []
 
         for idx, row in cleandata.iterrows():
+
+            # Uses cluster ID
             cluster_id = row['cluster']
 
-            # Get cluster statistics
+            # To get average cluster statistics
             cluster_avg_mass = cluster_stats.loc[cluster_id, ('mass', 'mean')]
             cluster_avg_radius = cluster_stats.loc[cluster_id, ('radius', 'mean')]
             cluster_avg_temp = cluster_stats.loc[cluster_id, ('temp', 'mean')]
@@ -551,6 +562,7 @@ class ClusterModel(MLModel):
             cluster_avg_dec = cluster_stats.loc[cluster_id, ('dec', 'mean')]
             cluster_avg_absmag = cluster_stats.loc[cluster_id, ('absmag', 'mean')]
 
+            # Features list created and added to each star
             features = [
                 row['mass'],
                 row['radius'],
@@ -570,11 +582,16 @@ class ClusterModel(MLModel):
             ]
 
             node_features.append(features)
+
+            # The same is done with the targets for each star. These are each star's luminosity
             node_targets.append(row['lum'])
 
+        # Features and targets lists are set to X and y respectively
         X = np.array(node_features)
         y = np.array(node_targets)
 
+
+        # Data splitting and normalization carried out
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(X, y, test_size=0.4, random_state=42)
 
         self.scaler = StandardScaler()
@@ -589,6 +606,9 @@ class ClusterModel(MLModel):
         if self.X_train is None:
             self.set_data()
 
+
+        # Much like with previous models, a RandomForestRegressor with 100 trees is used, the data is fitted,
+        # and the predictions are carried out.
         print(f"\nTraining Cluster-Based Random Forest Model...")
         self.model = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
         self.model.fit(self.X_train, self.y_train)
@@ -609,6 +629,7 @@ class ClusterModel(MLModel):
         cleandata = self.stardata.dropna(subset=self.required_features)
         cleandata['cluster'] = self.cluster_labels
 
+        # Plots clusters in a way to show mass-radius relationship
         scatter = ax1.scatter(cleandata['mass'], cleandata['radius'],
                               c=cleandata['cluster'], cmap='tab10',
                               alpha=0.6, s=20)
@@ -620,6 +641,7 @@ class ClusterModel(MLModel):
         plt.colorbar(scatter, ax=ax1, label='Cluster ID')
         ax1.grid(True, alpha=0.3)
 
+        # Plots clusters in a way to show temperature-luminosity relationship
         ax2 = fig.add_subplot(gs[0, 1])
         scatter2 = ax2.scatter(cleandata['temp'], cleandata['lum'],
                                c=cleandata['cluster'], cmap='tab10',
@@ -632,6 +654,8 @@ class ClusterModel(MLModel):
         plt.colorbar(scatter2, ax=ax2, label='Cluster ID')
         ax2.grid(True, alpha=0.3)
 
+
+        # Shows star count per cluster.
         ax3 = fig.add_subplot(gs[0, 2])
         cluster_counts = cleandata['cluster'].value_counts().sort_index()
         ax3.bar(cluster_counts.index, cluster_counts.values, color='steelblue')
@@ -640,6 +664,7 @@ class ClusterModel(MLModel):
         ax3.set_title('Stars per Cluster')
         ax3.grid(True, alpha=0.3, axis='y')
 
+        # R² graph
         ax4 = fig.add_subplot(gs[1, 0])
         ax4.scatter(self.y_test, self.y_pred, alpha=0.5, s=20, c='purple')
         ax4.plot([self.y_test.min(), self.y_test.max()],
@@ -650,12 +675,16 @@ class ClusterModel(MLModel):
         ax4.set_title(f'Cluster-Based Model (R² = {r2:.4f})')
         ax4.grid(True, alpha=0.3)
 
+
+        # Feature importance graph
         ax5 = fig.add_subplot(gs[1, 1])
         ax5.barh(self.feature_names, self.model.feature_importances_)
         ax5.set_xlabel('Importance')
         ax5.set_title('Feature Importance')
         ax5.grid(True, alpha=0.3)
 
+
+        # Residual graph
         ax6 = fig.add_subplot(gs[1, 2])
         residuals = self.y_test - self.y_pred
         ax6.scatter(self.y_pred, residuals, alpha=0.5, s=20, c='orange')
@@ -671,15 +700,19 @@ class ClusterModel(MLModel):
 '''================================================================================================================================================================'''
 '''================================================================================================================================================================'''
 
+# Strategy Pattern Class
 class ModelTrainer:
 
+    # Initialize with a strategy
     def __init__(self, strategy: MLModel):
         self.strategy = strategy
 
+    # Allows the strategy to be changed
     def set_strategy(self, strategy: MLModel):
-        """Change the strategy at runtime"""
         self.strategy = strategy
 
+
+    # Uses methods of a given strategy ML model to effectively run the model
     def run_training_pipeline(self):
         print(f"\n{'=' * 60}")
         print(f"Running {self.strategy.__class__.__name__}")
@@ -698,6 +731,8 @@ class ModelTrainer:
         filename = f"{graph_path}//{self.strategy.__class__.__name__.lower()}_results.png"
         self.strategy.visualize_model(filename)
 
+
+        # Returns model evaluation values.
         return results
 
 '''================================================================================================================================================================'''
@@ -707,7 +742,7 @@ class ModelTrainer:
 if __name__ == '__main__':
     warnings.filterwarnings('ignore', category=SettingWithCopyWarning)
 
-    # Strategy 1: Traditional ML
+    # Strategy 1: Traditional ML Model
     print("\n" + "=" * 60)
     print("STRATEGY 1: TRADITIONAL ML MODEL")
     print("=" * 60)
@@ -716,7 +751,7 @@ if __name__ == '__main__':
     trainer = ModelTrainer(traditional_model)
     results_traditional = trainer.run_training_pipeline()
 
-    # Strategy 2: Graph-Based ML
+    # Strategy 2: Graph-Based ML Model
     print("\n" + "=" * 60)
     print("STRATEGY 2: GRAPH-BASED ML MODEL")
     print("=" * 60)
@@ -725,7 +760,7 @@ if __name__ == '__main__':
     trainer.set_strategy(graph_model)
     results_graph = trainer.run_training_pipeline()
 
-    # Strategy 3: Cluster-Based ML
+    # Strategy 3: Cluster-Based ML Model
     print("\n" + "=" * 60)
     print("STRATEGY 3: CLUSTER-BASED ML MODEL")
     print("=" * 60)
@@ -734,7 +769,7 @@ if __name__ == '__main__':
     trainer.set_strategy(cluster_model)
     results_cluster = trainer.run_training_pipeline()
 
-    # Compare results
+    # Compare results (R² and RMSE)
     print("\n" + "=" * 60)
     print("MODEL COMPARISON")
     print("=" * 60)
@@ -742,15 +777,16 @@ if __name__ == '__main__':
     print(f"Graph-Based ML  - R²: {results_graph['r2']:.4f}, RMSE: {results_graph['rmse']:.4f}")
     print(f"Cluster-Based ML - R²: {results_cluster['r2']:.4f}, RMSE: {results_cluster['rmse']:.4f}")
 
-    # Determine best model
+    # Determine best model - Uses a dictionary to contain model name and R² value.
     results_dict = {
-        'Traditional ML': results_traditional['r2'],
-        'Graph-Based ML': results_graph['r2'],
-        'Cluster-Based ML': results_cluster['r2']
+        'Traditional ML Model': results_traditional['r2'],
+        'Graph-Based ML Model': results_graph['r2'],
+        'Cluster-Based ML Model': results_cluster['r2']
     }
 
+    # Shows the best model to the user (Based on highest R² value).
     best_model = max(results_dict, key=results_dict.get)
-    print(f"\n✓ Best performing model: {best_model} (R² = {results_dict[best_model]:.4f})")
+    print(f"\nBest performing model: {best_model} (R² = {results_dict[best_model]:.4f})")
 
 
 
